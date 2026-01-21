@@ -1,0 +1,21 @@
+{
+  ".": [
+    ".git",
+    ".vscode",
+    "test",
+    ".gitignore",
+    ".vscode-test.mjs",
+    ".vscodeignore",
+    "CHANGELOG.md",
+    "drag-n-drop-custom-sort-0.0.1.vsix",
+    "eslint.config.mjs",
+    "extension.js",
+    "icon.png",
+    "LICENSE",
+    "package.json",
+    "package-lock.json",
+    "jsconfig.json",
+    "README.md",
+    "vsc-extension-quickstart.md"
+  ]
+}

@@ -2,6 +2,14 @@
 
 A VS Code extension that allows you to **manually reorder files** in the explorer using drag and drop, regardless of alphabetical order.
 
+<br>
+
+<div align="center">
+  <video src="images/example.mp4" width="700" autoplay loop muted></video>
+</div>
+
+<br>
+
 ## Features
 * **Custom Sorting:** Organize your files in the order *you* want.
 * **Intuitive Drag & Drop:**

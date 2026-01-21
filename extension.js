@@ -9,28 +9,23 @@ class SortOrderManager {
     constructor(workspaceRoot) {
         this.workspaceRoot = workspaceRoot;
         this.sortFileUri = vscode.Uri.joinPath(workspaceRoot, '.vscode', 'sort-order.json');
-        this.orderCache = {}; // Memory cache: { "relative/path": ["fileA", "fileB"] }
+        this.orderCache = {}; 
         this.init();
     }
 
     async init() {
         try {
-            // Read sort-order.json if it exists
             const data = await vscode.workspace.fs.readFile(this.sortFileUri);
             this.orderCache = JSON.parse(new TextDecoder().decode(data));
         } catch (e) {
-            // Start empty if file doesn't exist
             this.orderCache = {};
         }
     }
 
     getOrder(folderUri) {
-        // Use relative path from root as key
         let relativePath = path.relative(this.workspaceRoot.fsPath, folderUri.fsPath);
-        if (relativePath === '') relativePath = '.'; // Handle root folder
-        // Normalize separators to '/' for JSON consistency
+        if (relativePath === '') relativePath = '.';
         relativePath = relativePath.split(path.sep).join('/');
-        
         return this.orderCache[relativePath] || [];
     }
 
@@ -45,11 +40,8 @@ class SortOrderManager {
 
     async save() {
         try {
-            // Create .vscode directory if it doesn't exist
             const vscodeDir = vscode.Uri.joinPath(this.workspaceRoot, '.vscode');
             try { await vscode.workspace.fs.createDirectory(vscodeDir); } catch {}
-
-            // Write to JSON file
             const data = new Uint8Array(Buffer.from(JSON.stringify(this.orderCache, null, 2)));
             await vscode.workspace.fs.writeFile(this.sortFileUri, data);
         } catch (e) {
@@ -62,7 +54,6 @@ function activate(context) {
     if (!vscode.workspace.workspaceFolders) return;
     const rootPath = vscode.workspace.workspaceFolders[0].uri;
     
-    // [Important] Create and inject manager
     const sortOrderManager = new SortOrderManager(rootPath);
     const myProvider = new FileSystemProvider(rootPath, sortOrderManager);
     const myDragController = new FileDragAndDropController(rootPath, sortOrderManager, myProvider);
@@ -75,7 +66,7 @@ function activate(context) {
     treeView.title = `${vscode.workspace.name} : Drag & Drop`;
 
     const commands = [
-        // --- Folder & Empty Space Commands ---
+        // --- Commands ---
         vscode.commands.registerCommand('explorerSort.newFile', async (item) => {
             const targetUri = item ? item.uri : rootPath;
             const folderUri = (item && item.type === vscode.FileType.File) ? vscode.Uri.file(path.dirname(targetUri.fsPath)) : targetUri;
@@ -85,7 +76,6 @@ function activate(context) {
                 const newFileUri = vscode.Uri.joinPath(folderUri, fileName);
                 await vscode.workspace.fs.writeFile(newFileUri, new Uint8Array());
                 
-                // Add to sort order (Append to end)
                 const currentOrder = sortOrderManager.getOrder(folderUri);
                 if (!currentOrder.includes(fileName)) {
                     await sortOrderManager.updateOrder(folderUri, [...currentOrder, fileName]);
@@ -123,7 +113,6 @@ function activate(context) {
                 let finalDestUri = destUri;
                 let finalName = fileName;
                 let counter = 1;
-                // Handle duplicate names (Smart Paste)
                 while (fs.existsSync(finalDestUri.fsPath)) {
                     const ext = path.extname(fileName);
                     const name = path.basename(fileName, ext);
@@ -205,7 +194,6 @@ function activate(context) {
     ];
 
     const watcher = vscode.workspace.createFileSystemWatcher('**/*');
-    // Reload sort order if files change externally
     watcher.onDidCreate(async () => { await sortOrderManager.init(); myProvider.refresh(); });
     watcher.onDidChange(async () => { myProvider.refresh(); });
     watcher.onDidDelete(async () => { await sortOrderManager.init(); myProvider.refresh(); });
@@ -236,7 +224,6 @@ class FileSystemProvider {
             const children = await vscode.workspace.fs.readDirectory(uri);
             const items = children.filter(([n]) => !['node_modules', '.git', '.DS_Store', '.vscode'].includes(n));
             
-            // [Core] Get custom sort order
             const order = this.sortOrderManager.getOrder(uri);
             
             items.sort((a, b) => {
@@ -244,14 +231,10 @@ class FileSystemProvider {
                 const indexA = order.indexOf(nameA);
                 const indexB = order.indexOf(nameB);
 
-                // 1. If both are in the list, follow the list order
                 if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                // 2. If only A is in the list, A comes first
                 if (indexA !== -1) return -1;
-                // 3. If only B is in the list, B comes first
                 if (indexB !== -1) return 1;
                 
-                // 4. Default sort (Folders first, then alphabetical)
                 if (a[1] === b[1]) return nameA.localeCompare(nameB);
                 return a[1] === vscode.FileType.Directory ? -1 : 1;
             });
@@ -261,7 +244,7 @@ class FileSystemProvider {
     }
 }
 
-// [3] DragAndDropController
+// [3] DragAndDropController (SMART & STRICT REORDER)
 class FileDragAndDropController {
     constructor(workspaceRoot, sortOrderManager, provider) {
         this.workspaceRoot = workspaceRoot;
@@ -277,22 +260,39 @@ class FileDragAndDropController {
         const transferItem = dataTransfer.get('text/uri-list');
         if (!transferItem) return;
 
-        // 1. Calculate parent URI
-        let parentUri = this.workspaceRoot;
-        if (target) {
-            parentUri = target.type === vscode.FileType.Directory 
-                ? target.uri 
-                : vscode.Uri.file(path.dirname(target.uri.fsPath));
-        }
-
         const uriList = await transferItem.asString();
         
-        let order = this.sortOrderManager.getOrder(parentUri);
-        if (order.length === 0) {
-            const children = await vscode.workspace.fs.readDirectory(parentUri);
-            order = children.map(c => c[0]);
+        // 1. 드롭된 위치(Context) 계산
+        // 타겟이 있으면 -> 그 타겟의 '부모 폴더'가 무대가 됨
+        // 타겟이 없으면(빈 공간) -> '루트 폴더'가 무대가 됨
+        let dropContextUri = this.workspaceRoot;
+        if (target) {
+            // [중요] 타겟이 폴더여도, "그 안"이 아니라 "그 폴더가 있는 위치"를 기준으로 잡음
+            // 이렇게 하면 폴더 안으로 들어가는 것을 원천 봉쇄할 수 있음
+            dropContextUri = vscode.Uri.file(path.dirname(target.uri.fsPath));
         }
-        let orderChanged = false;
+
+        // 2. 현재 폴더의 모든 파일 목록 가져오기 (장부 동기화용)
+        let children = [];
+        try {
+            children = await vscode.workspace.fs.readDirectory(dropContextUri);
+        } catch (e) { return; } // 읽기 실패시 중단
+
+        // 3. 순서 장부 로드 및 '누락된 파일' 채워넣기 (Freeze Order)
+        // 이 과정이 없으면 장부에 없는 폴더 위로 드래그할 때 순서가 안 바뀜!
+        let order = this.sortOrderManager.getOrder(dropContextUri);
+        const missingItems = children.filter(([name]) => !order.includes(name));
+        
+        if (missingItems.length > 0) {
+            // 누락된 애들은 기본 순서(폴더 우선 + 이름순)대로 정렬해서 장부 뒤에 붙임
+            missingItems.sort((a, b) => {
+                if (a[1] === b[1]) return a[0].localeCompare(b[0]);
+                return a[1] === vscode.FileType.Directory ? -1 : 1;
+            });
+            order = [...order, ...missingItems.map(m => m[0])];
+        }
+
+        const foldersToUpdate = new Set();
 
         for (const line of uriList.split('\r\n')) {
             if (!line.trim()) continue;
@@ -301,71 +301,44 @@ class FileDragAndDropController {
                 const sourceParent = vscode.Uri.file(path.dirname(sourceUri.fsPath));
                 const fileName = path.basename(sourceUri.fsPath);
 
-                // ==========================================================
-                // CASE 1: [Drop on File] -> Insert BEFORE that file
-                // ==========================================================
-                if (target && target.type === vscode.FileType.File) {
+                // [철벽 방어] 형제(같은 폴더)가 아니면 절대 안 받아줌
+                // 이 조건 때문에 폴더 안으로 이동하는게 물리적으로 불가능해짐
+                if (sourceParent.fsPath !== dropContextUri.fsPath) {
+                    continue; 
+                }
+
+                // 이제 안심하고 순서 변경 (Reorder)
+                if (target) {
+                    // Case A: 특정 파일/폴더 위에 드롭 -> 그 녀석 "앞(위)"으로 이동
                     const targetName = path.basename(target.uri.fsPath);
-                    let toIndex = order.indexOf(targetName);
-                    if (toIndex === -1) toIndex = order.length;
-
-                    // A. Same folder reordering
-                    if (sourceParent.fsPath === parentUri.fsPath) {
-                        const fromIndex = order.indexOf(fileName);
-                        if (fromIndex !== -1 && fromIndex !== toIndex) {
-                            order.splice(fromIndex, 1);
-                            if (fromIndex < toIndex) toIndex--;
-                            order.splice(toIndex, 0, fileName);
-                            orderChanged = true;
-                        }
-                    } 
-                    // B. Move from different folder and insert
-                    else {
-                        const destUri = vscode.Uri.joinPath(parentUri, fileName);
-                        await vscode.workspace.fs.rename(sourceUri, destUri, { overwrite: false });
-                        order.splice(toIndex, 0, fileName);
-                        orderChanged = true;
+                    const fromIndex = order.indexOf(fileName);
+                    const toIndex = order.indexOf(targetName);
+                    
+                    // 둘 다 장부에 확실히 존재함 (위에서 채워넣었으므로)
+                    if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+                        order.splice(fromIndex, 1);
+                        // 아래에서 위로 갈 때 인덱스 밀림 보정
+                        const insertIndex = (fromIndex < toIndex) ? toIndex - 1 : toIndex;
+                        order.splice(insertIndex, 0, fileName);
+                        
+                        await this.sortOrderManager.updateOrder(dropContextUri, order);
+                        foldersToUpdate.add(dropContextUri.fsPath);
+                    }
+                } else {
+                    // Case B: 빈 공간 드롭 -> 맨 뒤로
+                    const fromIndex = order.indexOf(fileName);
+                    if (fromIndex !== -1 && fromIndex !== order.length - 1) {
+                        order.splice(fromIndex, 1);
+                        order.push(fileName);
+                        await this.sortOrderManager.updateOrder(dropContextUri, order);
+                        foldersToUpdate.add(dropContextUri.fsPath);
                     }
                 }
-                
-                // ==========================================================
-                // CASE 2: [Drop on Folder/Empty Space] -> Move to END
-                // ==========================================================
-                else {
-                    // A. Same folder -> Move to end
-                    if (sourceParent.fsPath === parentUri.fsPath) {
-                        const fromIndex = order.indexOf(fileName);
-                        if (fromIndex !== -1 && fromIndex !== order.length - 1) {
-                            order.splice(fromIndex, 1);
-                            order.push(fileName);
-                            orderChanged = true;
-                        }
-                    } 
-                    // B. Move from different folder -> Append to end
-                    else {
-                        const destUri = vscode.Uri.joinPath(parentUri, fileName);
-                        if (sourceUri.fsPath !== destUri.fsPath) {
-                            await vscode.workspace.fs.rename(sourceUri, destUri, { overwrite: false });
-                            
-                            if (!order.includes(fileName)) {
-                                order.push(fileName);
-                            } else {
-                                // If it somehow exists in the list, move to end
-                                const idx = order.indexOf(fileName);
-                                if (idx !== -1) order.splice(idx, 1);
-                                order.push(fileName);
-                            }
-                            orderChanged = true;
-                        }
-                    }
-                }
-
             } catch (e) {
-                vscode.window.showErrorMessage(`Operation failed: ${e.message}`);
+                vscode.window.showErrorMessage(`Failed: ${e.message}`);
             }
         }
-
-        if (orderChanged) await this.sortOrderManager.updateOrder(parentUri, order);
+        
         this.provider.refresh();
     }
 }
