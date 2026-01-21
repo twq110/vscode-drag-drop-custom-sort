@@ -2,7 +2,7 @@
 "name": "drag-n-drop-custom-sort",
   "displayName": "Drag & Drop Custom Sort",
   "description": "Custom sort order for VS Code explorer via drag and drop.",
-  "version": "0.0.1",
+  "version": "1.0.1",
   "publisher": "twq110",
   "icon": "icon.png",
   "repository": {
