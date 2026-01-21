@@ -1,0 +1,102 @@
+{
+"name": "drag-n-drop-custom-sort",
+  "displayName": "Drag & Drop Custom Sort",
+  "description": "Custom sort order for VS Code explorer via drag and drop.",
+  "version": "0.0.1",
+  "publisher": "twq110",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/twq110/vscode-drag-drop-custom-sort"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.108.1"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:drag-n-drop-files.fileView"
+  ],
+  "main": "./extension.js",
+"contributes": {
+    "views": {
+      "explorer": [
+        { "id": "drag-n-drop-files.fileView", "name": "Drag & Drop" }
+      ]
+    },
+    "commands": [
+      { "command": "explorerSort.newFile", "title": "New File", "icon": "$(new-file)" },
+      { "command": "explorerSort.newFolder", "title": "New Folder", "icon": "$(new-folder)" },
+      { "command": "explorerSort.paste", "title": "Paste", "icon": "$(clippy)" },
+      { "command": "explorerSort.findInFolder", "title": "Find in Folder", "icon": "$(search)" },
+      
+      { "command": "explorerSort.runTests", "title": "Run Tests", "icon": "$(beaker)" },
+      { "command": "explorerSort.debugTests", "title": "Debug Tests", "icon": "$(debug-alt)" },
+      { "command": "explorerSort.runCoverage", "title": "Run Tests with Coverage", "icon": "$(run-coverage)" },
+      
+      { "command": "explorerSort.openToSide", "title": "Open to the Side", "icon": "$(split)" },
+      { "command": "explorerSort.openWith", "title": "Open With...", "icon": "$(file-code)" },
+      { "command": "explorerSort.revealInFileExplorer", "title": "Reveal in File Explorer", "icon": "$(folder-opened)" },
+      { "command": "explorerSort.openInIntegratedTerminal", "title": "Open in Integrated Terminal", "icon": "$(terminal)" },
+      { "command": "explorerSort.selectForCompare", "title": "Select for Compare", "icon": "$(git-compare)" },
+      { "command": "explorerSort.compareWithSelected", "title": "Compare with Selected", "icon": "$(diff)" },
+      { "command": "explorerSort.openTimeline", "title": "Open Timeline", "icon": "$(clock)" },
+      { "command": "explorerSort.cut", "title": "Cut", "icon": "$(cut)" },
+      { "command": "explorerSort.copy", "title": "Copy", "icon": "$(copy)" },
+      { "command": "explorerSort.copyPath", "title": "Copy Path", "icon": "$(link)" },
+      { "command": "explorerSort.copyRelativePath", "title": "Copy Relative Path", "icon": "$(link)" },
+      { "command": "explorerSort.rename", "title": "Rename...", "icon": "$(edit)" },
+      { "command": "explorerSort.delete", "title": "Delete", "icon": "$(trash)" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "explorerSort.newFile", "when": "view == drag-n-drop-files.fileView", "group": "navigation" },
+        { "command": "explorerSort.newFolder", "when": "view == drag-n-drop-files.fileView", "group": "navigation" },
+        { "command": "explorerSort.paste", "when": "view == drag-n-drop-files.fileView", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "explorerSort.newFile", "when": "view == drag-n-drop-files.fileView && viewItem == directory", "group": "navigation" },
+        { "command": "explorerSort.newFolder", "when": "view == drag-n-drop-files.fileView && viewItem == directory", "group": "navigation" },
+        { "command": "explorerSort.openInIntegratedTerminal", "when": "view == drag-n-drop-files.fileView", "group": "0_open" },
+        { "command": "explorerSort.findInFolder", "when": "view == drag-n-drop-files.fileView && viewItem == directory", "group": "0_open" },
+
+        { "command": "explorerSort.openToSide", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "0_open@1" },
+        { "command": "explorerSort.openWith", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "0_open@2" },
+        { "command": "explorerSort.revealInFileExplorer", "when": "view == drag-n-drop-files.fileView", "group": "0_open@3" },
+        
+        { "command": "explorerSort.selectForCompare", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "1_compare@1" },
+        { "command": "explorerSort.compareWithSelected", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "1_compare@2" },
+        { "command": "explorerSort.openTimeline", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "1_compare@3" },
+        
+        { "command": "explorerSort.cut", "when": "view == drag-n-drop-files.fileView", "group": "3_clipboard@1" },
+        { "command": "explorerSort.copy", "when": "view == drag-n-drop-files.fileView", "group": "3_clipboard@2" },
+        { "command": "explorerSort.paste", "when": "view == drag-n-drop-files.fileView && viewItem == directory", "group": "3_clipboard@3" },
+        
+        { "command": "explorerSort.copyPath", "when": "view == drag-n-drop-files.fileView", "group": "4_path@1" },
+        { "command": "explorerSort.copyRelativePath", "when": "view == drag-n-drop-files.fileView", "group": "4_path@2" },
+        
+        { "command": "explorerSort.runTests", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "6_test@1" },
+        { "command": "explorerSort.debugTests", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "6_test@2" },
+        { "command": "explorerSort.runCoverage", "when": "view == drag-n-drop-files.fileView && viewItem == file", "group": "6_test@3" },
+
+        { "command": "explorerSort.rename", "when": "view == drag-n-drop-files.fileView", "group": "9_edit@1" },
+        { "command": "explorerSort.delete", "when": "view == drag-n-drop-files.fileView", "group": "9_edit@2" }
+      ]
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.108.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "eslint": "^9.39.2",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}

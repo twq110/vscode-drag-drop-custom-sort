@@ -1,0 +1,16 @@
+{
+    "explorerSort.rules": [
+        {
+            "name": "Auto-generated for **/testspace\\third-files/**",
+            "pathPattern": "**/testspace\\third-files/**",
+            "priorities": [
+                {
+                    "condition": "name === 'YES.py'",
+                    "priority": 0,
+                    "referenceFile": "test6.py",
+                    "offset": 0
+                }
+            ]
+        }
+    ]
+}
